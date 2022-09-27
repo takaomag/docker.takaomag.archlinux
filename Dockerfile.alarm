@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile-upstream:master-labs
+## syntax=docker/dockerfile:1.3-labs
+
+# takaomag/alarm
+# https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md
+# https://hub.docker.com/_/archlinux/
+# https://github.com/archlinux/archlinux-docker/
+# https://github.com/agners/archlinuxarm-docker
+# https://github.com/lopsided98/archlinux-docker
+# https://github.com/samip5/archlinux-docker
+# https://gist.github.com/thaJeztah/cfd929a31976b745e3f7515ae37eb192
+
+
+######## Inspect scratch image
+# FROM scratch AS one
+# SHELL ["/.tmp.busybox/bin/busybox", "sh", "-ec"]
+
+# ## busybox will now be at /.tmp.busybox/bin/busybox (PATH is still taken into account)
+# # RUN --mount=from=busybox:latest,dst=/.tmp.busybox/ ["/.tmp.busybox/bin/busybox", "sh", "-c", "ls -al / > /output"]
+# RUN --mount=from=busybox:latest,dst=/.tmp.busybox/ <<EODF
+# /.tmp.busybox/bin/ls -al / > /output
+# EODF
+
+# FROM busybox
+# COPY --from=one /output /
+# CMD cat /output
+
+
+FROM scratch as rootfs_img
+
+ARG A_ROOTFS_FILE_PATH=ArchLinuxARM-aarch64-latest.tar.gz
+
+ADD $A_ROOTFS_FILE_PATH /
+
+SHELL ["/usr/bin/bash", "-ec"]
+
+RUN <<EORUN
+echo "2016-03-03-0" > /dev/null
+set -eo pipefail
+export TERM=dumb
+export LANG='en_US.UTF-8'
+
+userdel --remove alarm
+pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vi which
+update-ca-trust
+pacman-key --init
+pacman-key --populate
+pacman -Syyu --noconfirm --noprogressbar
+rm -rf /var/cache/pacman/pkg/*
+rm -f /var/log/pacman.log
+rm -f ~/.pip/pip.log
+rm -rf ~/.cache/pip
+rm -f ~/.*_history
+rm -f ~/.*hist
+find /tmp -mindepth 1 -delete || true
+find /var/tmp -mindepth 1 -delete || true
+
+find / -type f -name "*.pacsave" -delete || true
+# rm -f /.dockerenv
+# rm -f /.dockerinit
+rm -f /etc/hostname
+rm -f /etc/machine-id
+## https://github.com/archlinux/archlinux-docker/blob/master/Makefile
+rm -rf /etc/pacman.d/gnupg/{openpgp-revocs.d/,private-keys-v1.d/,pubring.gpg~,gnupg.S.}*
+rm -f /etc/ssh/ssh_host_*
+# find /usr/share/man -mindepth 1 -delete || true
+find /var/cache/pacman/pkg -mindepth 1 -delete || true
+find /var/lib/pacman/sync -mindepth 1 -delete || true
+
+shopt -s dotglob
+rm -rf /root/*
+shopt -u dotglob
+EORUN
+
+
+FROM scratch
+
+COPY --from=rootfs_img / /
+
+LABEL maintainer "takaomag <takaomag@users.noreply.github.com>"
+
+ENV \
+  container=docker
+
+# WORKDIR /var/tmp

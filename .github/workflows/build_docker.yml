@@ -1,0 +1,213 @@
+name: Build/Push Archlinux Docker image
+
+on:
+  push:
+    branches:
+      - "**"
+      # - main
+      # - "releases/**"
+    paths-ignore:
+      - "*.md"
+      - .editorconfig.d/**
+      - .vscode/**
+      - .gitattributes
+      - .gitignore
+    tags:
+      - "**"
+  # release:
+  #   types:
+  #     - published
+  schedule:
+    - cron: "14 20 * * *"
+
+  workflow_dispatch:
+    inputs:
+      amd64_base_image_repo:
+        description: "[amd64] base archlinux docker repository"
+        type: string
+        required: false
+        default: "library/archlinux"
+      amd64_base_image_tag:
+        description: "[amd64] base archlinux docker image tag"
+        type: string
+        required: false
+        default: "latest"
+      aarch64_rootfs_file_url:
+        description: "[aarch64] base rootfs file url"
+        type: string
+        required: false
+        default: ""
+      output_image_tag:
+        description: Tag for built docker image
+        type: string
+        required: false
+        default: ""
+concurrency:
+  # group: "${{ github.workflow }}@${{ github.event.pull_request.head.label || github.head_ref || github.ref || github.run_id }}"
+  group: "${{ github.workflow }}@${{ inputs.output_image_tag || 'default' }}.${{ github.ref || github.run_id }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DOCKER_BUILDKIT: "1"
+  X_AMD64_BASE_IMAGE_REPO: >-
+    ${{
+      github.event_name == 'workflow_dispatch' && inputs.amd64_base_image_repo
+      || 'library/archlinux'
+    }}
+  X_AMD64_BASE_IMAGE_TAG: >-
+    ${{
+      github.event_name == 'workflow_dispatch' && inputs.amd64_base_image_tag
+      || 'latest'
+    }}
+  X_AARCH64_ROOTFS_FILE_URL: >-
+    ${{
+      github.event_name == 'workflow_dispatch' && inputs.aarch64_rootfs_file_url
+      || 'http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz'
+    }}
+  X_OUTPUT_IMAGE_REPO: "takaomag/archlinux"
+
+jobs:
+  build_push_docker_image_archlinux:
+    name: Build/Push docker image (Archlinux)
+    timeout-minutes: 59
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: variables
+        id: variables_default
+        run: |-
+          _start_ts=$(date '+%Y%m%d%H%M%S')
+          _github_normalized_ref_name=$(sed -e 's/[^a-zA-Z0-9\-_]/-/g' <<< ${GITHUB_REF_NAME})
+          _amd64_base_image_info=$(
+            curl --fail --silent --location --retry 5 "https://hub.docker.com/v2/repositories/${{ env.X_AMD64_BASE_IMAGE_REPO }}/tags/?page_size=1000" \
+            | jq --compact-output '.results | map(select(.name == "${{ env.X_AMD64_BASE_IMAGE_TAG }}" and .tag_status == "active" and .images[].architecture == "amd64" and .images[].os == "linux" and .images[].status == "active"))[0].images[0] | {digest, last_pushed}'
+          )
+          _amd64_base_image_digest=$(echo ${_amd64_base_image_info}  | jq -r .digest)
+          _amd64_base_image_digest_short=$(echo ${_amd64_base_image_digest} | cut -d ':' -f 2 | cut -c 1-12)
+          echo "X_START_TS=${_start_ts}" >> $GITHUB_ENV
+          echo "X_GITHUB_NORMALIZED_REF_NAME=${_github_normalized_ref_name}" >> $GITHUB_ENV
+          echo "X_GITHUB_SHA_SHORT=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+          echo "X_AMD64_BASE_IMAGE_INFO=${_amd64_base_image_info}" >> $GITHUB_ENV
+          echo "X_AMD64_BASE_IMAGE_DIGEST=${_amd64_base_image_digest}" >> $GITHUB_ENV
+          echo "X_AMD64_BASE_IMAGE_DIGEST_SHORT=${_amd64_base_image_digest_short}" >> $GITHUB_ENV
+          echo "::set-output name=start_ts::${_start_ts}"
+          echo "::set-output name=github_normalized_ref_name::${_github_normalized_ref_name}"
+          echo "::set-output name=github_sha_short::${GITHUB_SHA:0:7}"
+          echo "::set-output name=amd64_base_image_info::${_amd64_base_image_info}"
+          echo "::set-output name=amd64_base_image_digest::${_amd64_base_image_digest}"
+          echo "::set-output name=amd64_base_image_digest_short::${_amd64_base_image_digest_short}"
+
+      ## By default, this action uses the Git context, so you don't need to use the actions/checkout action to check out the repository as this will be done directly by BuildKit.
+      ## https://github.com/docker/build-push-action#git-context
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup QEMU
+        id: setup_qemu
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Setup Docker buildx
+        id: setup_docker_buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login docker registry
+        id: login_docker_registry
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_IO_ROBOT_ACCOUNT_NAME }}
+          password: ${{ secrets.QUAY_IO_ROBOT_ACCOUNT_PASSWORD }}
+          logout: true
+
+      - name: Get aarch64 rootfs files
+        id: get_aarch64_rootfs_files
+        run: |-
+          mkdir -p .tmp.github.actions
+          cd .tmp.github.actions
+          curl --fail --silent --location --retry 5 -O "${X_AARCH64_ROOTFS_FILE_URL}"
+          _aarch64_rootfs_file_name=$(ls -A | head -n1)
+          echo "X_AARCH64_ROOTFS_FILE_NAME=${_aarch64_rootfs_file_name}" >> $GITHUB_ENV
+          echo "::set-output name=aarch64_rootfs_file_name::${_aarch64_rootfs_file_name}"
+
+      - name: Build/Push arm64/v8 docker image
+        id: build_push_arm64_v8_docker_image
+        uses: docker/build-push-action@v3
+        with:
+          pull: false
+          push: true
+          # pushせずにローカルに保存
+          # load: true
+          ## localのファイルを見るので`.`
+          # context: "{{defaultContext}}"
+          context: .
+          file: Dockerfile.alarm
+          no-cache: true
+          platforms: linux/arm64/v8
+          # 改行コードを使用しているので`|`とかは使わず"で囲んでいる。
+          build-args: |
+            "A_ROOTFS_FILE_PATH=.tmp.github.actions/${{ env.X_AARCH64_ROOTFS_FILE_NAME }}"
+          labels: |
+            "x_github_ref=${{ github.ref }}"
+            "x_github_ref_name=${{ github.ref_name }}"
+            "x_github_sha=${{ github.sha }}"
+          tags: |
+            ${{ format('quay.io/{0}:{1}.{2}.{3}.arm64-v8', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+
+      - name: Get/Push amd64 docker image
+        id: get_push_amd64_docker_image
+        run: |-
+          docker pull --platform linux/amd64 --quiet \
+            ${{ env.X_AMD64_BASE_IMAGE_REPO }}@${{ env.X_AMD64_BASE_IMAGE_DIGEST }}
+          docker tag \
+            ${{ env.X_AMD64_BASE_IMAGE_REPO }}@${{ env.X_AMD64_BASE_IMAGE_DIGEST }} \
+            ${{ format('quay.io/{0}:{1}.{2}.{3}.amd64', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+          docker push --quiet \
+            ${{ format('quay.io/{0}:{1}.{2}.{3}.amd64', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+
+      - name: Push docker manifest
+        id: push_docker_manifest
+        run: |-
+          _cond='${{ github.event_name == 'workflow_dispatch' && inputs.output_image_tag != '' && 'specific' || github.ref == 'refs/heads/main' && 'main' || 'other' }}'
+          if [[ "${_cond}" == 'specific' ]];then
+            _tags=(
+              '${{ format('quay.io/{0}:{1}', env.X_OUTPUT_IMAGE_REPO, inputs.output_image_tag) }}'
+            )
+          elif [[ "${_cond}" == 'main' ]];then
+            _tags=(
+              '${{ format('quay.io/{0}:{1}.{2}.{3}', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}'
+              '${{ format('quay.io/{0}:{1}', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME) }}'
+              '${{ format('quay.io/{0}:latest', env.X_OUTPUT_IMAGE_REPO) }}'
+            )
+          else
+            _tags=(
+              '${{ format('quay.io/{0}:{1}.{2}.{3}', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}'
+              '${{ format('quay.io/{0}:{1}', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME) }}'
+            )
+          fi
+
+          _amd64=${{ format('quay.io/{0}:{1}.{2}.{3}.amd64', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+          _arm64v8=${{ format('quay.io/{0}:{1}.{2}.{3}.arm64-v8', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+
+          for _manifest_list in ${_tags[@]};do
+            docker manifest create --insecure "${_manifest_list}" \
+              "${_amd64}" \
+              "${_arm64v8}"
+            docker manifest annotate "${_manifest_list}" \
+              "${_amd64}" \
+              --os linux --arch amd64
+            docker manifest annotate "${_manifest_list}" \
+              "${_arm64v8}" \
+              --os linux --arch arm64 --variant v8
+            docker manifest push "${_manifest_list}"
+          done

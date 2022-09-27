@@ -1,0 +1,16 @@
+**/.git
+**/.gitattributes
+**/.github
+**/.gitignore
+**/.gitmodules
+**/*.code-workspace
+**/.vscode
+**/.devcontainer
+**/.editorconfig
+
+**/*.egg-info/
+**/__pycache__
+
+README.md
+CHANGES.md
+tmp
