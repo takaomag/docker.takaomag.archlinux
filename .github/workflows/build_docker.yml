@@ -211,3 +211,26 @@ jobs:
               --os linux --arch arm64 --variant v8
             docker manifest push "${_manifest_list}"
           done
+
+      - name: Dispatch workflow (base)
+        id: dispatch_workflow_tmpl_rust
+        if: >-
+          ${{
+            github.ref == 'refs/heads/main'
+            && (github.event_name != 'workflow_dispatch' || inputs.output_image_tag == '')
+          }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_ACTIONS_PAT }}
+          script: |-
+            const {X_OUTPUT_IMAGE_REPO} = process.env
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: 'docker.takaomag.base',
+              workflow_id: 'build_docker.yml',
+              ref: 'main',
+              inputs: {
+                base_image_repo: `${X_OUTPUT_IMAGE_REPO}`,
+                base_image_tag: 'latest',
+              }
+            })
