@@ -96,12 +96,12 @@ jobs:
           echo "X_AMD64_BASE_IMAGE_INFO=${_amd64_base_image_info}" >> $GITHUB_ENV
           echo "X_AMD64_BASE_IMAGE_DIGEST=${_amd64_base_image_digest}" >> $GITHUB_ENV
           echo "X_AMD64_BASE_IMAGE_DIGEST_SHORT=${_amd64_base_image_digest_short}" >> $GITHUB_ENV
-          echo "::set-output name=start_ts::${_start_ts}"
-          echo "::set-output name=github_normalized_ref_name::${_github_normalized_ref_name}"
-          echo "::set-output name=github_sha_short::${GITHUB_SHA:0:7}"
-          echo "::set-output name=amd64_base_image_info::${_amd64_base_image_info}"
-          echo "::set-output name=amd64_base_image_digest::${_amd64_base_image_digest}"
-          echo "::set-output name=amd64_base_image_digest_short::${_amd64_base_image_digest_short}"
+          echo "start_ts=${_start_ts}" >> $GITHUB_OUTPUT
+          echo "github_normalized_ref_name=${_github_normalized_ref_name}" >> $GITHUB_OUTPUT
+          echo "github_sha_short=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "amd64_base_image_info=${_amd64_base_image_info}" >> $GITHUB_OUTPUT
+          echo "amd64_base_image_digest=${_amd64_base_image_digest}" >> $GITHUB_OUTPUT
+          echo "amd64_base_image_digest_short=${_amd64_base_image_digest_short}" >> $GITHUB_OUTPUT
 
       ## By default, this action uses the Git context, so you don't need to use the actions/checkout action to check out the repository as this will be done directly by BuildKit.
       ## https://github.com/docker/build-push-action#git-context
