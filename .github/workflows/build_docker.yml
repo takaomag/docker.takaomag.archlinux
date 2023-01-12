@@ -138,7 +138,7 @@ jobs:
           curl --fail --silent --location --retry 5 -O "${X_AARCH64_ROOTFS_FILE_URL}"
           _aarch64_rootfs_file_name=$(ls -A | head -n1)
           echo "X_AARCH64_ROOTFS_FILE_NAME=${_aarch64_rootfs_file_name}" >> $GITHUB_ENV
-          echo "::set-output name=aarch64_rootfs_file_name::${_aarch64_rootfs_file_name}"
+          echo "aarch64_rootfs_file_name=${_aarch64_rootfs_file_name}" >> $GITHUB_OUTPUT
 
       - name: Build/Push arm64/v8 docker image
         id: build_push_arm64_v8_docker_image
