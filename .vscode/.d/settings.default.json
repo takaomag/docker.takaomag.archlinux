@@ -48,6 +48,7 @@
     "rootfs",
     "rustfmt",
     "seccomp",
+    "SLSA",
     "takaomag",
     "tmpl",
     "toolchain"

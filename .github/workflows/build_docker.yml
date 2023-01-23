@@ -163,6 +163,9 @@ jobs:
             "x_github_sha=${{ github.sha }}"
           tags: |
             ${{ format('quay.io/{0}:{1}.{2}.{3}.arm64-v8', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
+          # Buildx v0.10 enables support for a minimal SLSA Provenance attestation, which introduces issues with registry and runtime support. Disable it.
+          # https://github.com/docker/build-push-action/releases/tag/v3.3.0
+          provenance: false
 
       - name: Get/Push amd64 docker image
         id: get_push_amd64_docker_image
