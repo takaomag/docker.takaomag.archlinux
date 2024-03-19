@@ -28,7 +28,10 @@
 
 FROM scratch as rootfs_img
 
-ARG A_ROOTFS_FILE_PATH=ArchLinuxARM-aarch64-latest.tar.gz
+ARG \
+  TARGETOS \
+  TARGETARCH \
+  A_ROOTFS_FILE_PATH=ArchLinuxARM-aarch64-latest.tar.gz
 
 ADD $A_ROOTFS_FILE_PATH /
 
@@ -40,12 +43,21 @@ set -eo pipefail
 export TERM=dumb
 export LANG='en_US.UTF-8'
 
+if [[ -z "${TARGETOS}" ]] || [[ -z "${TARGETARCH}" ]]; then
+  msg_error "[ERROR] `TARGETOS` or `TARGETARCH` is not set. Enable buildkit."
+  echo
+  exit 1
+fi
+
+# export GOOS=${TARGETOS}
+# export GOARCH=${TARGETARCH}
+
 userdel --remove alarm
 pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vi which
 update-ca-trust
 pacman-key --init
 pacman-key --populate
-pacman -Syyu --noconfirm --noprogressbar
+pacman -Syyuu --needed --noprogressbar --noconfirm
 
 
 ######## /etc/pacman.conf
