@@ -132,7 +132,7 @@ FROM scratch
 
 COPY --from=rootfs_img / /
 
-LABEL maintainer "takaomag <takaomag@users.noreply.github.com>"
+LABEL maintainer="takaomag <takaomag@users.noreply.github.com>"
 
 ENV \
   container=docker
