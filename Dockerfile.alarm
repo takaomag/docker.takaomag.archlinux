@@ -26,7 +26,7 @@
 # CMD cat /output
 
 
-FROM scratch as rootfs_img
+FROM scratch AS rootfs_img
 
 ARG \
   TARGETOS \
