@@ -86,7 +86,7 @@ jobs:
           _github_normalized_ref_name=$(sed -e 's/[^a-zA-Z0-9\-_]/-/g' <<< ${GITHUB_REF_NAME})
           _amd64_base_image_info=$(
             curl --fail --silent --location --retry 5 "https://hub.docker.com/v2/repositories/${{ env.X_AMD64_BASE_IMAGE_REPO }}/tags/?page_size=1000" \
-            | jq --compact-output '.results | map(select(.name == "${{ env.X_AMD64_BASE_IMAGE_TAG }}" and .tag_status == "active" and .images[].architecture == "amd64" and .images[].os == "linux" and .images[].status == "active"))[0].images[0] | {digest, last_pushed}'
+            | jq --compact-output '.results | map(select(.name == "${{ env.X_AMD64_BASE_IMAGE_TAG }}" and .tag_status == "active"))[0].images | map(select(.architecture == "amd64" and .os == "linux" and .status == "active"))[0] | {digest, last_pushed}'
           )
           _amd64_base_image_digest=$(echo ${_amd64_base_image_info}  | jq -r .digest)
           _amd64_base_image_digest_short=$(echo ${_amd64_base_image_digest} | cut -d ':' -f 2 | cut -c 1-12)
