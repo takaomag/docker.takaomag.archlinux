@@ -56,8 +56,11 @@ pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vi wh
 update-ca-trust
 pacman-key --init
 pacman-key --populate
-pacman -Syyuu --needed --noprogressbar --noconfirm
-
+if [[ "${TARGETARCH}" == 'arm64' ]];then
+  pacman -Syyuu --needed --noprogressbar --noconfirm --disable-sandbox
+else
+  pacman -Syyuu --needed --noprogressbar --noconfirm
+fi
 
 ######## /etc/pacman.conf
 sed --in-place -E 's/^#\s*NoProgressBar\s*/NoProgressBar/' /etc/pacman.conf
@@ -66,6 +69,10 @@ sed --in-place -E 's/^CheckSpace\s*/#CheckSpace/' /etc/pacman.conf
 sed --in-place -E 's/^#\s*VerbosePkgLists\s*/VerbosePkgLists/' /etc/pacman.conf
 sed --in-place -E 's/^#\s*(ParallelDownloads\s*=.+)/\1/' /etc/pacman.conf
 sed --in-place -E '/^ParallelDownloads/a DisableDownloadTimeout' /etc/pacman.conf
+if [[ "${TARGETARCH}" == 'arm64' ]];then
+  sed --in-place -E 's/^#\s*DisableSandboxFilesystem\s*/DisableSandboxFilesystem/' /etc/pacman.conf
+  sed --in-place -E 's/^#\s*DisableSandboxSyscalls\s*/DisableSandboxSyscalls/' /etc/pacman.conf
+fi
 if ! grep -E '^NoExtract\s*=' /etc/pacman.conf;then
   cat <<-'HEND' >> /etc/pacman.conf
 
