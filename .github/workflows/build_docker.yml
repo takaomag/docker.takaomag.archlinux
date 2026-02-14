@@ -103,6 +103,22 @@ jobs:
           echo "amd64_base_image_digest=${_amd64_base_image_digest}" >> $GITHUB_OUTPUT
           echo "amd64_base_image_digest_short=${_amd64_base_image_digest_short}" >> $GITHUB_OUTPUT
 
+      ## Workaround to GitHub Actions docker v29.1 issue, which causes "manifest invalid" error on docker manifest push.
+      ## https://github.com/actions/runner-images/issues/13474
+      ## https://www.ytyng.com/blog/docker-29-ecr-push-403-forbidden-containerd-image-store/
+      ## https://blog.arthur1.dev/entry/2026/02/13/132102
+      - name: Disable containerd-snapshotter
+        id: disable_containerd_snapshotter
+        run: |-
+          DAEMON_JSON="/etc/docker/daemon.json"
+          if [ -f "${DAEMON_JSON}" ]; then
+            _TMP_JSON_STR=$(sudo jq '. + {"features": {"containerd-snapshotter": false}}' "${DAEMON_JSON}")
+            echo -n ${_TMP_JSON_STR} | sudo tee "${DAEMON_JSON}" > /dev/null
+          else
+            echo -n '{"features": {"containerd-snapshotter": false}}' | sudo tee "${DAEMON_JSON}" > /dev/null
+          fi
+          sudo systemctl restart docker.service
+
       ## By default, this action uses the Git context, so you don't need to use the actions/checkout action to check out the repository as this will be done directly by BuildKit.
       ## https://github.com/docker/build-push-action#git-context
       - name: Checkout
@@ -215,7 +231,7 @@ jobs:
             docker manifest annotate "${_manifest_list}" \
               "${_arm64v8}" \
               --os linux --arch arm64 --variant v8
-            docker manifest push "${_manifest_list}"
+            docker manifest push --purge "${_manifest_list}"
           done
 
       - name: Dispatch workflow (base)
