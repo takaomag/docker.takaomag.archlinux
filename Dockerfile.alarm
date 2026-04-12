@@ -51,7 +51,7 @@ fi
 # export GOOS=${TARGETOS}
 # export GOARCH=${TARGETARCH}
 
-userdel --remove alarm
+userdel --remove alarm || true
 pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vi which
 update-ca-trust
 pacman-key --init
