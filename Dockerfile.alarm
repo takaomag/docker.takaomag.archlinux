@@ -52,7 +52,7 @@ fi
 # export GOARCH=${TARGETARCH}
 
 userdel --remove alarm || true
-pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vi which
+pacman -Rsn --noconfirm dhcpcd linux-aarch64 nano net-tools netctl openssh vim which
 update-ca-trust
 pacman-key --init
 pacman-key --populate
@@ -112,10 +112,10 @@ rm -f ~/.pip/pip.log
 rm -rf ~/.cache/pip
 rm -f ~/.*_history
 rm -f ~/.*hist
-find /tmp -mindepth 1 -delete || true
-find /var/tmp -mindepth 1 -delete || true
+find /tmp -mindepth 1 -delete -ignore_readdir_race || true
+find /var/tmp -mindepth 1 -delete -ignore_readdir_race || true
 
-find / -type f -name "*.pacsave" -delete || true
+find / -type f -name "*.pacsave" -delete -ignore_readdir_race || true
 # rm -f /.dockerenv
 # rm -f /.dockerinit
 rm -f /etc/hostname
@@ -124,9 +124,9 @@ rm -f /etc/machine-id
 rm -rf /etc/pacman.d/gnupg/{openpgp-revocs.d/,private-keys-v1.d/,pubring.gpg~,gnupg.S.}*
 rm -rf /etc/pacman.d/gnupg/S.gpg-agent*
 rm -f /etc/ssh/ssh_host_*
-# find /usr/share/man -mindepth 1 -delete || true
-find /var/cache/pacman/pkg -mindepth 1 -delete || true
-find /var/lib/pacman/sync -mindepth 1 -delete || true
+# find /usr/share/man -mindepth 1 -delete -ignore_readdir_race || true
+find /var/cache/pacman/pkg -mindepth 1 -delete -ignore_readdir_race || true
+find /var/lib/pacman/sync -mindepth 1 -delete -ignore_readdir_race || true
 
 shopt -s dotglob
 rm -rf /root/*
