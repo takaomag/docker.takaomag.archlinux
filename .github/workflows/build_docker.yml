@@ -221,18 +221,13 @@ jobs:
           _amd64=${{ format('quay.io/{0}:{1}.{2}.{3}.amd64', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
           _arm64v8=${{ format('quay.io/{0}:{1}.{2}.{3}.arm64-v8', env.X_OUTPUT_IMAGE_REPO, env.X_GITHUB_NORMALIZED_REF_NAME, env.X_START_TS, env.X_GITHUB_SHA_SHORT) }}
 
-          for _manifest_list in ${_tags[@]};do
-            docker manifest create --insecure "${_manifest_list}" \
-              "${_amd64}" \
-              "${_arm64v8}"
-            docker manifest annotate "${_manifest_list}" \
-              "${_amd64}" \
-              --os linux --arch amd64
-            docker manifest annotate "${_manifest_list}" \
-              "${_arm64v8}" \
-              --os linux --arch arm64 --variant v8
-            docker manifest push --purge "${_manifest_list}"
+          _tag_args=()
+          for _t in "${_tags[@]}";do
+            _tag_args+=(--tag "${_t}")
           done
+          docker buildx imagetools create "${_tag_args[@]}" "${_amd64}" "${_arm64v8}"
+          ## 結果のindexをログに出す(不要なら削除可)
+          docker buildx imagetools inspect "${_tags[0]}"
 
       - name: Dispatch workflow (base)
         id: dispatch_workflow_tmpl_rust
